@@ -1,0 +1,7 @@
+log_level: DEBUG
+server:
+  host: localhost
+  port: 33333
+  idle_timeout: 30m
+foo: baz
+word_wrap_min: 80

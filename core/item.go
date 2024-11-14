@@ -1,4 +1,4 @@
 package core
 
-type Item struct {
+type Item interface {
 }

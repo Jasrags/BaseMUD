@@ -7,11 +7,11 @@ type (
 )
 
 const (
-	AreaAudience    Audience = "area"
-	PartyAudience   Audience = "party"
-	PrivateAudience Audience = "private"
-	RoomAudience    Audience = "room"
-	WorldAudience   Audience = "world"
+// AreaAudience    Audience = "area"
+// PartyAudience   Audience = "party"
+// PrivateAudience Audience = "private"
+// RoomAudience    Audience = "room"
+// WorldAudience   Audience = "world"
 )
 
 type Channel interface {

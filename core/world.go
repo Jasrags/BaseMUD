@@ -119,7 +119,6 @@ func (w *World) setupSSHServer() {
 }
 
 func (w *World) startSSHServer() {
-	// Start SSH server
 	serverHost := viper.GetString("server.host")
 	serverPort := viper.GetString("server.port")
 	log.Info().Str("host", serverHost).Str("port", serverPort).Msg("Starting server")

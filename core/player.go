@@ -26,6 +26,15 @@ type Player struct {
 	PubSub *gochannel.GoChannel
 }
 
+type P interface {
+	AddPrompt(id string, renderer func(), removeOnRender bool)
+	HasPrompt(id string) bool
+	MoveTo(nextRoom R, onMoved func())
+	QueueCommand(executable string, lag int) // CommandExecutable
+	RemovePrompt(id string)
+	EnterRoom(room R)
+}
+
 func NewPlayer() *Player {
 	var em eventemitter.EventEmitter
 	var ob eventemitter.Observable

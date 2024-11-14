@@ -19,6 +19,13 @@ type Room struct {
 	// // doors []Door
 }
 
+type R interface {
+	AddPlayer(p *Player)
+	Emit(event string, args ...interface{})
+	GetBroadcastTargets() (*Room, []*Player, []*NPC)
+	RemovePlayer(p *Player)
+}
+
 func NewRoom() *Room {
 	return &Room{
 		Players: make(map[string]*Player),
@@ -38,6 +45,11 @@ func (r *Room) Emit(event string, args ...interface{}) {
 		Str("source", "room").
 		Str("event", event).
 		Msg("Emitting event")
+}
+
+func (r *Room) GetBroadcastTargets() (*Room, []*Player, []*NPC) {
+	return r, []*Player{}, []*NPC{}
+
 }
 
 type EventRoomPlayerEnter struct {

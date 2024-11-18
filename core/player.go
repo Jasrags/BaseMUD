@@ -1,62 +1,145 @@
 package core
 
 import (
-	"github.com/ThreeDotsLabs/watermill"
-	"github.com/ThreeDotsLabs/watermill/message"
-	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
 	"github.com/gliderlabs/ssh"
-	"github.com/rs/zerolog/log"
 	eventemitter "github.com/vansante/go-event-emitter"
 )
 
+const (
+	PlayerAttributeUpdated eventemitter.EventType = "Player#event:attributeUpdated"
+	PlayerCombatantAdded   eventemitter.EventType = "Player#event:combatantAdded"
+	PlayerCombatantRemoved eventemitter.EventType = "Player#event:combatantRemoved"
+	PlayerCombatEnd        eventemitter.EventType = "Player#event:combatEnd"
+	PlayerCombatStart      eventemitter.EventType = "Player#event:combatStart"
+	PlayerDamaged          eventemitter.EventType = "Player#event:damaged"
+	PlayerEffectAdded      eventemitter.EventType = "Player#event:effectAdded"
+	PlayerEffectRemoved    eventemitter.EventType = "Player#event:effectRemoved"
+	PlayerEnterRoom        eventemitter.EventType = "Player#event:enterRoom"
+	PlayerEquip            eventemitter.EventType = "Player#event:equip"
+	PlayerFollowed         eventemitter.EventType = "Player#event:followed"
+	PlayerGainedFollower   eventemitter.EventType = "Player#event:gainedFollower"
+	PlayerHeal             eventemitter.EventType = "Player#event:heal"
+	PlayerHealed           eventemitter.EventType = "Player#event:healed"
+	PlayerHit              eventemitter.EventType = "Player#event:hit"
+	PlayerLostFollower     eventemitter.EventType = "Player#event:lostFollower"
+	PlayerSaved            eventemitter.EventType = "Player#event:saved"
+	PlayerUnquip           eventemitter.EventType = "Player#event:unquip"
+	PlayerUnfollowed       eventemitter.EventType = "Player#event:unfollowed"
+	PlayerUpdateTick       eventemitter.EventType = "Player#event:updateTick"
+)
+
+type PlayerRole int
+
+const (
+	RolePlayer PlayerRole = iota
+	RoleBuilder
+	RoleAdmin
+)
+
+// type Player interface {
+// 	Character
+
+// 	AddPrompt(id string, renderer func(), removeOnRender bool)
+// 	Emit(eventName string, args ...interface{})
+// 	GetName() string
+// 	GetSession() ssh.Session
+// 	HasPrompt(id string) bool
+// 	MoveTo(nextRoom Room, onMoved func())
+// 	QueueCommand(executable string, lag int) // CommandExecutable
+// 	RemovePrompt(id string)
+// 	EnterRoom(room Room)
+
+// 	eventemitter.EventEmitter
+// 	eventemitter.Observable
+// }
+
+// Character
+// name 	string
+// inventory 	Inventory
+// combatants 	Set
+// level 	number
+// attributes 	Attributes
+// effects 	EffectList
+// room 	Room
+
+// Player
+// account 	Account
+// experience 	number
+// password 	string
+// prompt 	string
+// socket 	net.Socket
+// questTracker 	QuestTracker
+// extraPrompts 	Map.<string, function()>
+// questData 	Object
+
+// Room the character is currently in
+
 type Player struct {
-	Character
-	eventemitter.EventEmitter
-	eventemitter.Observable
-	// EventEmitter eventemitter.EventEmitter
-	Account *Account
-	// Experience int
-	// Password string
-	// Prompt   string
-	Session ssh.Session
-	// QuestTracker *QuestTracker
+	Account    *Account
+	Experience int
+	Password   string
+	Prompt     string
+	Session    ssh.Session
+	//  QuestTracker
 	// ExtraPrompts
 	// QuestData
 
-	PubSub *gochannel.GoChannel
+	// pubSub *gochannel.GoChannel
+
+	Character
 }
 
-type P interface {
-	AddPrompt(id string, renderer func(), removeOnRender bool)
-	HasPrompt(id string) bool
-	MoveTo(nextRoom R, onMoved func())
-	QueueCommand(executable string, lag int) // CommandExecutable
-	RemovePrompt(id string)
-	EnterRoom(room R)
-}
-
-func NewPlayer() *Player {
-	var em eventemitter.EventEmitter
-	var ob eventemitter.Observable
-
-	e := eventemitter.NewEmitter(true)
-	em = e
-	ob = e
-	return &Player{
-		EventEmitter: em,
-		Observable:   ob,
+func NewPlayer(s ssh.Session, em eventemitter.EventEmitter, ob eventemitter.Observable) *Player {
+	p := &Player{
+		Session: s,
 	}
+
+	p.EventEmitter = em
+	p.Observable = ob
+
+	return p
 }
 
-/*
-Room#event:playerLeave
-Room#event:playerEnter
-Player#event:enterRoom
-*/
+// AddPrompt implements Player.
+func (p *Player) AddPrompt(id string, renderer func(), removeOnRender bool) {
+	panic("unimplemented")
+}
+
+// // GetBroadcastTargets implements Player.
+// func (p *Player) GetBroadcastTargets() {
+// 	panic("unimplemented")
+// }
+
+// HasPrompt implements Player.
+func (p *Player) HasPrompt(id string) bool {
+	panic("unimplemented")
+}
+
+// Hydrate implements Player.
+func (p *Player) Hydrate(state string) {
+	panic("unimplemented")
+}
+
+func (p *Player) InterpolatePrompt(promptStr, extraData string) {
+
+}
+
+func (p *Player) IsNpc() bool {
+	return false
+}
+
+// MoveTo implements Player.
+// Emits
+// Room#event:playerLeave
+// Room#event:playerEnter
+// Player#event:enterRoom
 func (p *Player) MoveTo(nextRoom *Room, onMoved func()) {
 	prevRoom := p.Room
-	if p.Room != nil && p.Room.ID != nextRoom.ID {
-		p.Emit("playerLeave", prevRoom)
+
+	if p.Room != nil && p.Room.GetID() != nextRoom.GetID() {
+		p.EmitEvent(RoomPlayerLeave, prevRoom.GetID(), p.Name)
+		// p.Emit(RoomPlayerLeave, prevRoom.GetID())
+		// p.room.Emit(string(RoomPlayerLeave), prevRoom.GetID())
 		p.Room.RemovePlayer(p)
 	}
 
@@ -65,24 +148,23 @@ func (p *Player) MoveTo(nextRoom *Room, onMoved func()) {
 
 	onMoved()
 
-	nextRoom.Emit("room:playerEnter", p, prevRoom)
-	// p.Emit("player:enterRoom", nextRoom)
-	p.EventEmitter.EmitEvent(EventPlayerEnterRoom, nextRoom)
+	nextRoom.EmitEvent(RoomPlayerEnter, p.Room.GetID(), p.Name)
+	// nextRoom.Emit("Room#event:playerEnter", p.room.GetID())
+	p.EmitEvent(PlayerEnterRoom, nextRoom.GetID())
+	// p.Emit("Player#event:enterRoom", nextRoom.GetID())
 }
 
-const (
-	EventPlayerEnterRoom eventemitter.EventType = "player:enterRoom"
-)
-
-func (p *Player) Emit(event string, args ...interface{}) {
-	log.Debug().
-		Str("source", "player").
-		Str("event", event).
-		Msg("Emitting event")
-
-	p.PubSub.Publish("player", message.NewMessage(watermill.NewUUID(), []byte(event)))
+// QueueCommand implements Player.
+func (p *Player) QueueCommand(executable string, lag int) {
+	panic("unimplemented")
 }
 
-// type EventPlayerEnterRoom struct {
-// 	PrevRoom *Room
-// }
+// RemovePrompt implements Player.
+func (p *Player) RemovePrompt(id string) {
+	panic("unimplemented")
+}
+
+// Serialize implements Player.
+func (p *Player) Serialize() string {
+	return ""
+}

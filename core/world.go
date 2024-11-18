@@ -1,36 +1,62 @@
 package core
 
 import (
-	"context"
-	"fmt"
 	"net"
 	"os"
 
 	"github.com/ThreeDotsLabs/watermill"
-	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gliderlabs/ssh"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
+	eventemitter "github.com/vansante/go-event-emitter"
 	"golang.org/x/term"
 )
 
 type World struct {
-	srv    *ssh.Server
-	PubSub *gochannel.GoChannel
+	srv     *ssh.Server
+	account *AccountManager
+	player  *PlayerManager
+	room    *RoomManager
+	pubSub  *gochannel.GoChannel
+
+	// e emitter.Emitter
+
+	eventemitter.EventEmitter
+	eventemitter.Observable
 }
 
 func NewWorld() *World {
-	return &World{}
+	e := eventemitter.NewEmitter(true)
+
+	pubSub := gochannel.NewGoChannel(
+		gochannel.Config{},
+		watermill.NewStdLogger(true, false),
+	)
+
+	// ee := emitter.New(10)
+
+	return &World{
+		EventEmitter: e,
+		Observable:   e,
+		pubSub:       pubSub,
+
+		account: NewAccountManager(),
+		player:  NewPlayerManager(e, e),
+		room:    NewRoomManager(e, e),
+	}
 }
 
 func (w *World) Init() {
 	w.setupConfig()
 	w.setupLogger()
 	w.outputConfig()
-	w.setupPubSub()
+	w.account.LoadAccounts()
+	w.player.LoadPlayers()
+	w.room.LoadRooms()
+	// w.setupPubSub()
 	w.setupSSHServer()
 	w.startSSHServer()
 }
@@ -56,7 +82,7 @@ func (w *World) setupLogger() {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel) // Default to Info
 
 	// Attempt to parse the log_level from the config file
-	logLevel, err := zerolog.ParseLevel(viper.GetString("log_level"))
+	logLevel, err := zerolog.ParseLevel(viper.GetString("server.log_level"))
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to parse log_level")
 	} else {
@@ -78,27 +104,27 @@ func (w *World) outputConfig() {
 	}
 }
 
-func (w *World) setupPubSub() {
-	// Setup PubSub
-	w.PubSub = gochannel.NewGoChannel(
-		gochannel.Config{},
-		watermill.NewStdLogger(true, false),
-	)
+// func (w *World) setupPubSub() {
+// 	// Setup PubSub
+// 	w.pubSub = gochannel.NewGoChannel(
+// 		gochannel.Config{},
+// 		watermill.NewStdLogger(true, false),
+// 	)
 
-	playerMessages, err := w.PubSub.Subscribe(context.Background(), "player")
-	if err != nil {
-		log.Fatal().Err(err).Msg("Error subscribing to player messages")
-	}
+// 	playerMessages, err := w.PubSub.Subscribe(context.Background(), "player")
+// 	if err != nil {
+// 		log.Fatal().Err(err).Msg("Error subscribing to player messages")
+// 	}
 
-	roomMessages, err := w.PubSub.Subscribe(context.Background(), "room")
-	if err != nil {
-		log.Fatal().Err(err).Msg("Error subscribing to room messages")
-	}
+// 	roomMessages, err := w.PubSub.Subscribe(context.Background(), "room")
+// 	if err != nil {
+// 		log.Fatal().Err(err).Msg("Error subscribing to room messages")
+// 	}
 
-	go process(playerMessages)
-	go process(roomMessages)
+// 	go process(playerMessages)
+// 	go process(roomMessages)
 
-}
+// }
 
 func (w *World) setupSSHServer() {
 	serverHost := viper.GetString("server.host")
@@ -128,37 +154,74 @@ func (w *World) startSSHServer() {
 	}
 }
 
-func process(messages <-chan *message.Message) {
-	for msg := range messages {
-		fmt.Printf("received message: %s, payload: %s\n", msg.UUID, string(msg.Payload))
-		msg.Ack()
-	}
-}
+// func process(messages <-chan *message.Message) {
+// 	for msg := range messages {
+// 		fmt.Printf("received message: %s, payload: %s\n", msg.UUID, string(msg.Payload))
+// 		msg.Ack()
+// 	}
+// }
 
 func (w *World) Handler(s ssh.Session) {
-	p := &Player{
-		PubSub: w.PubSub,
-		Account: &Account{
-			// Username: "Jasrags",
-			Characters: []string{"Jasrags"},
-		},
-		Character: Character{
-			Name: "Jasrags",
-		},
-		Session: s,
-	}
-
-	p.MoveTo(TheVoid.Rooms[0], func() {})
-
 	log.Info().
 		Str("user", s.User()).
 		Str("remote_addr", s.RemoteAddr().String()).
 		Str("session_id", s.Context().SessionID()).
 		Msg("New SSH connection")
 
-	// w.Users[s.Context().SessionID()] = u
-	// u.Room.Enter(s)
-	// u.Room.Render(s)
+	a, err := w.account.GetAccount("test")
+
+	if err != nil {
+		log.Error().Err(err).Msg("Unable to get account")
+		return
+	}
+	a.Serialize()
+
+	p, err := w.player.GetPlayer("test")
+	if err != nil {
+		log.Error().Err(err).Msg("Unable to get player")
+		return
+	}
+	p.Serialize()
+
+	theVoid, err := w.room.GetRoom("the_void:the_void")
+	if err != nil {
+		log.Error().Err(err).Msg("Unable to get room")
+		return
+	}
+	limbo, err := w.room.GetRoom("the_void:limbo")
+	if err != nil {
+		log.Error().Err(err).Msg("Unable to get room")
+		return
+	}
+
+	// theVoid.AddCapturer(eventemitter.CaptureFunc(func(event eventemitter.EventType, arguments ...interface{}) {
+	// 	l := log.Info().Str("event", string(event))
+	// 	for _, arg := range arguments {
+	// 		l.Interface("arg", arg)
+	// 	}
+	// 	l.Msg("Player entered room:capturer")
+	// }))
+
+	theVoid.AddListener(RoomPlayerEnter, eventemitter.HandleFunc(func(arguments ...interface{}) {
+		l := log.Info().Str("event", string(RoomPlayerEnter))
+		for _, arg := range arguments {
+			l.Interface("arg", arg)
+		}
+		l.Msg("Player entered room:listener")
+	}))
+
+	theVoid.AddListener(RoomPlayerLeave, eventemitter.HandleFunc(func(arguments ...interface{}) {
+		l := log.Info().Str("event", string(RoomPlayerEnter))
+		for _, arg := range arguments {
+			l.Interface("arg", arg)
+		}
+		l.Msg("Player left room:listener")
+	}))
+
+	// p.EnterRoom(theVoid)
+	theVoid.Render(s)
+	p.MoveTo(limbo, func() {})
+	// r.Render(s)
 
 	t := term.NewTerminal(s, "> ")
 	for {
@@ -225,7 +288,7 @@ func (w *World) Handler(s ssh.Session) {
 // func (r *Room) Render(s ssh.Session) {
 // 	// userCount := len(r.Users)
 // 	io.WriteString(s, cfmt.Sprintf("{{%s\n}}::green", r.Title))
-// 	io.WriteString(s, cfmt.Sprintf("{{%s\n}}::bold", wordwrap.WrapString(r.Description, uint(viper.GetInt("word_wrap_min")))))
+// 	io.WriteString(s, cfmt.Sprintf("{{%s\n}}::bold", wordwrap.WrapString(r.Description, uint(viper.GetInt("terminal.word_wrap_min")))))
 // 	// io.WriteString(s, cfmt.Sprintf("There are {{%d}}::yellow|bold other %s here\n", userCount, pluralise.WithCount("user", userCount)))
 // }
 

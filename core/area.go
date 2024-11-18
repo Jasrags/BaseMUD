@@ -1,9 +1,17 @@
 package core
 
-import "github.com/rs/zerolog/log"
+import eventemitter "github.com/vansante/go-event-emitter"
 
-// type Coordinate struct {
-// X, Y, Z int
+// type Area interface {
+// 	AddNpc(n NPC)
+// 	AddRoom(r Room)
+// 	AddRoomToMap(r Room)
+// 	GetBroadcastTargets() // npcs, players, rooms, and the area itself
+// 	GetRoomAtCoordinates(x, y, z int) Room
+// 	GetRoomByID(id string) Room
+// 	RemoveNpc(n NPC)
+// 	RemoveRoom(r Room)
+// 	Update(state string)
 // }
 
 type Area struct {
@@ -11,36 +19,81 @@ type Area struct {
 	Title string
 	// Script string
 	// Map   map[int]Coordinate
-	Rooms map[int]*Room
-	// NPCs []NPC
+	Rooms map[string]*Room
+	Npcs  []*Npc
 	// Info Object
 	// LastRespawnTick int
+
+	// areaPath
+	// floors
 }
+
+const (
+	AreaRoomAdded   eventemitter.EventType = "Area#event:roomAdded"
+	AreaRoomRemoved eventemitter.EventType = "Area#event:roomRemoved"
+)
 
 func NewArea() *Area {
 	return &Area{
-		Rooms: make(map[int]*Room),
+		Rooms: make(map[string]*Room),
 	}
 }
 
-func (a *Area) AddRoom(r *Room) {
-	a.Rooms[r.ID] = r
-
-	// if a.Map == nil {
-	// a.AddRoomToMap(r)
-	// }
-
-	a.Emit("area:roomAdded", r)
-
+// AddNpc implements Area.
+func (a *Area) AddNpc(n *Npc) {
+	a.Npcs = append(a.Npcs, n)
 }
 
-// func (a *Area) AddRoomToMap(r *Room) {
-// a.Map[r.Coordinates.Z] = *r.Coordinates
-// }
+// AddRoom implements Area.
+// Emits
+// Area#event:roomAdded
+func (a *Area) AddRoom(r *Room) {
+	a.Rooms[r.GetID()] = r
+}
 
-func (a *Area) Emit(event string, args ...interface{}) {
-	log.Debug().
-		Str("source", "area").
-		Str("event", event).
-		Msg("Emitting event")
+// AddRoomToMap implements Area.
+func (a *Area) AddRoomToMap(r *Room) {
+	panic("unimplemented")
+}
+
+// GetBroadcastTargets implements Area.
+func (a *Area) GetBroadcastTargets() {
+	panic("unimplemented")
+}
+
+// GetRoomAtCoordinates implements Area.
+func (a *Area) GetRoomAtCoordinates(x int, y int, z int) *Room {
+	panic("unimplemented")
+}
+
+// GetRoomByID implements Area.
+func (a *Area) GetRoomByID(id string) *Room {
+	if room, ok := a.Rooms[id]; ok {
+		return room
+	}
+	return nil
+}
+
+// RemoveNpc implements Area.
+func (a *Area) RemoveNpc(n *Npc) {
+	// for i, npc := range a.Npcs {
+	// 	if npc.Id == n.Id {
+	// 		a.Npcs = append(a.Npcs[:i], a.Npcs[i+1:]...)
+	// 		return
+	// 	}
+	// }
+}
+
+// RemoveRoom implements Area.
+// Emits Area#event:roomRemoved
+func (a *Area) RemoveRoom(r *Room) {
+	delete(a.Rooms, r.GetID())
+}
+
+// Update implements Area.
+// Emits
+// Room#event:updateTick
+// Npc#event:updateTick
+func (a *Area) Update(state string) {
+	panic("unimplemented")
 }

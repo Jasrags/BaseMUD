@@ -1,50 +1,147 @@
 package core
 
+import (
+	"errors"
+
+	"github.com/rs/zerolog/log"
+	eventemitter "github.com/vansante/go-event-emitter"
+)
+
+// type PlayerManager interface {
+// 	AddPlayer(p Player) error
+// 	Exists(id string) bool
+// 	Filter(fn func()) []Player
+// 	GetBroadcastTargets() []Character
+// 	GetPlayer(id string) (Player, error)
+// 	GetPlayersAsArray() []Player
+// 	Keyify(p Player) string
+// 	LoadPlayer(state string, a Account, username string, force bool) Player
+// 	LoadPlayers() error
+// 	RemovePlayer(id string, killSocket bool)
+// 	Save()
+// 	SaveAll()
+// 	TickAll()
+
+// 	eventemitter.EventEmitter
+// 	eventemitter.Observable
+// }
+
+/*
+Listens to Events:
+
+	PlayerManager#event:save
+	PlayerManager#event:updateTick
+*/
 type PlayerManager struct {
-	Players map[string]*Player
-	//Events EventManager
-	//Loader EntityLoader
+	players map[string]*Player
+
+	eventemitter.EventEmitter
+	eventemitter.Observable
 }
 
-func NewPlayerManager() *PlayerManager {
+func NewPlayerManager(em eventemitter.EventEmitter, ob eventemitter.Observable) *PlayerManager {
 	return &PlayerManager{
-		Players: make(map[string]*Player),
+		players: make(map[string]*Player),
+
+		EventEmitter: em,
+		Observable:   ob,
 	}
 }
 
-func (pm *PlayerManager) AddListener(BehaviorName string, Listener func()) {
+// AddPlayer implements PlayerManager.
+func (pm *PlayerManager) AddPlayer(p *Player) error {
+	if _, ok := pm.players[p.Name]; ok {
+		log.Error().Msg("Player already registered")
 
-}
-
-func (pm *PlayerManager) AddPlayer(p *Player) {
-	pm.Players[p.ID] = p
-}
-
-func (pm *PlayerManager) Exists(id string) bool {
-	_, ok := pm.Players[id]
-	return ok
-}
-
-// Filter
-
-// getBroadcastTargets
-
-func (pm *PlayerManager) GetPlayer(id string) *Player {
-	return pm.Players[id]
-}
-
-func (pm *PlayerManager) GetPlayers() []*Player {
-	var players []*Player
-	for _, p := range pm.Players {
-		players = append(players, p)
+		return errors.New("player already registered")
 	}
-	return players
-}
+	pm.players[p.Name] = p
 
-func (pm *PlayerManager) LoadPlayer(state string, account Account, username string, force bool) *Player {
 	return nil
 }
 
+// Exists implements PlayerManager.
+func (pm *PlayerManager) Exists(id string) bool {
+	_, ok := pm.players[id]
+
+	return ok
+}
+
+// Filter implements PlayerManager.
+func (pm *PlayerManager) Filter(fn func()) []*Player {
+	panic("unimplemented")
+}
+
+// GetBroadcastTargets implements PlayerManager.
+func (pm *PlayerManager) GetBroadcastTargets() []Character {
+	panic("unimplemented")
+}
+
+// GetPlayer implements PlayerManager.
+func (pm *PlayerManager) GetPlayer(id string) (*Player, error) {
+	if p, ok := pm.players[id]; ok {
+		return p, nil
+	}
+
+	log.Error().Err(errors.New("Player not found"))
+
+	return nil, errors.New("Player not found")
+}
+
+// GetPlayersAsArray implements PlayerManager.
+func (pm *PlayerManager) GetPlayersAsArray() []*Player {
+	panic("unimplemented")
+}
+
+// Keyify implements PlayerManager.
+func (pm *PlayerManager) Keyify(p *Player) string {
+	panic("unimplemented")
+}
+
+// LoadPlayer implements PlayerManager.
+func (pm *PlayerManager) LoadPlayer(state string, a *Account, username string, force bool) *Player {
+	panic("unimplemented")
+}
+
+func (pm *PlayerManager) LoadPlayers() error {
+	log.Info().Msg("Loading players")
+	pm.players = map[string]*Player{
+		"test": {
+			// EventEmitter: pm.EventEmitter,
+			// Observable:   pm.Observable,
+			// Name:         "test",
+			Account: &Account{
+				Id:         "1",
+				Username:   "test",
+				Characters: []string{"test"},
+				Password:   "test",
+				Banned:     false,
+			},
+		},
+	}
+
+	return nil
+}
+
+// RemovePlayer implements PlayerManager.
 func (pm *PlayerManager) RemovePlayer(id string, killSocket bool) {
-	delete(pm.Players, id)
+	delete(pm.players, id)
+}
+
+// Save implements PlayerManager.
+// Emits Player#event:save
+func (pm *PlayerManager) Save() {
+	pm.EmitEvent("Player#event:save", "Save")
+}
+
+// SaveAll implements PlayerManager.
+// Emits Player#event:saved
+func (pm *PlayerManager) SaveAll() {
+	pm.EmitEvent("Player#event:saved", "SaveAll")
+	panic("unimplemented")
+}
+
+// Emits Player#event:updateTick
+func (pm *PlayerManager) TickAll() {
+	pm.EmitEvent("Player#event:updateTick", "TickAll")
 }

@@ -1,9 +1,7 @@
 package core
 
 type (
-	Audience   string
-	PlayerRole string
-	GameState  string
+	Audience string
 )
 
 const (
@@ -14,16 +12,19 @@ const (
 // WorldAudience   Audience = "world"
 )
 
-type Channel interface {
-	Name() string
-	Color() []string
-	Description() string
-	MinRequiredRole() PlayerRole
-	Audience() Audience
-	SenderFormat() string
-	TargetFormat() string
+// type Channel interface {
+// 	Name() string
+// 	Color() []string
+// 	Description() string
+// 	MinRequiredRole() PlayerRole
+// 	Audience() Audience
+// 	SenderFormat() string
+// 	TargetFormat() string
 
-	FormatToReceipient(sender, target, message string) string
-	FormatToSender(sender, message string) string
-	Send(state, sender, message string)
+// 	FormatToReceipient(sender, target, message string) string
+// 	FormatToSender(sender, message string) string
+// 	Send(state, sender, message string)
+// }
+
+type Channel struct {
 }

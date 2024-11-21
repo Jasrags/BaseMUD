@@ -1,9 +1,14 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/viper"
 	eventemitter "github.com/vansante/go-event-emitter"
 )
 
@@ -33,7 +38,7 @@ Listens to Events:
 	PlayerManager#event:updateTick
 */
 type PlayerManager struct {
-	players map[string]*Player
+	Players map[string]*Player
 
 	eventemitter.EventEmitter
 	eventemitter.Observable
@@ -41,7 +46,7 @@ type PlayerManager struct {
 
 func NewPlayerManager(em eventemitter.EventEmitter, ob eventemitter.Observable) *PlayerManager {
 	return &PlayerManager{
-		players: make(map[string]*Player),
+		Players: make(map[string]*Player),
 
 		EventEmitter: em,
 		Observable:   ob,
@@ -50,19 +55,19 @@ func NewPlayerManager(em eventemitter.EventEmitter, ob eventemitter.Observable) 
 
 // AddPlayer implements PlayerManager.
 func (pm *PlayerManager) AddPlayer(p *Player) error {
-	if _, ok := pm.players[p.Name]; ok {
+	if _, ok := pm.Players[p.Name]; ok {
 		log.Error().Msg("Player already registered")
 
 		return errors.New("player already registered")
 	}
-	pm.players[p.Name] = p
+	pm.Players[p.Name] = p
 
 	return nil
 }
 
 // Exists implements PlayerManager.
 func (pm *PlayerManager) Exists(id string) bool {
-	_, ok := pm.players[id]
+	_, ok := pm.Players[id]
 
 	return ok
 }
@@ -78,12 +83,14 @@ func (pm *PlayerManager) GetBroadcastTargets() []Character {
 }
 
 // GetPlayer implements PlayerManager.
-func (pm *PlayerManager) GetPlayer(id string) (*Player, error) {
-	if p, ok := pm.players[id]; ok {
+func (pm *PlayerManager) GetPlayer(name string) (*Player, error) {
+	if p, ok := pm.Players[strings.ToLower(name)]; ok {
 		return p, nil
 	}
 
-	log.Error().Err(errors.New("Player not found"))
+	log.Error().
+		Str("name", name).
+		Err(errors.New("Player not found"))
 
 	return nil, errors.New("Player not found")
 }
@@ -104,34 +111,67 @@ func (pm *PlayerManager) LoadPlayer(state string, a *Account, username string, f
 }
 
 func (pm *PlayerManager) LoadPlayers() error {
-	log.Info().Msg("Loading players")
-	pm.players = map[string]*Player{
-		"test": {
-			// EventEmitter: pm.EventEmitter,
-			// Observable:   pm.Observable,
-			// Name:         "test",
-			Account: &Account{
-				Id:         "1",
-				Username:   "test",
-				Characters: []string{"test"},
-				Password:   "test",
-				Banned:     false,
-			},
-		},
+	playersPath := viper.GetString("data.players_path")
+	log.Info().
+		Str("path", playersPath).
+		Msg("Loading players")
+
+	files, err := os.ReadDir(playersPath)
+	if err != nil {
+		log.Error().
+			Str("path", playersPath).
+			Err(err).
+			Msg("Failed to read players directory")
+
+		return err
 	}
+
+	for _, file := range files {
+		if filepath.Ext(file.Name()) == ".json" {
+			filePath := filepath.Join(playersPath, file.Name())
+
+			data, err := os.ReadFile(filePath)
+			if err != nil {
+				log.Error().
+					Str("file_path", filePath).
+					Err(err).
+					Msg("Failed to read file")
+				continue
+			}
+
+			var p Player
+			if err := json.Unmarshal(data, &p); err != nil {
+				log.Error().
+					Err(err).
+					Str("file_path", filePath).
+					Msg("Failed to unmarshal player data from file")
+				continue
+			}
+
+			pm.Players[strings.ToLower(p.Name)] = &p
+			log.Debug().
+				Str("name", p.Name).
+				Msg("Loaded player")
+		}
+	}
+
+	log.Info().
+		Int("count", len(pm.Players)).
+		Msg("Players loaded")
 
 	return nil
 }
 
 // RemovePlayer implements PlayerManager.
 func (pm *PlayerManager) RemovePlayer(id string, killSocket bool) {
-	delete(pm.players, id)
+	delete(pm.Players, id)
 }
 
 // Save implements PlayerManager.
 // Emits Player#event:save
 func (pm *PlayerManager) Save() {
 	pm.EmitEvent("Player#event:save", "Save")
+	panic("unimplemented")
 }
 
 // SaveAll implements PlayerManager.
@@ -144,4 +184,5 @@ func (pm *PlayerManager) SaveAll() {
 // Emits Player#event:updateTick
 func (pm *PlayerManager) TickAll() {
 	pm.EmitEvent("Player#event:updateTick", "TickAll")
+	panic("unimplemented")
 }

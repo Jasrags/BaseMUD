@@ -1,9 +1,9 @@
+---
 - id: the_void
   title: The Void
   coordinates: [0, 0, 0]
   description: |
     You don't think that you are not floating in nothing.
-
 - id: limbo
   title: Limbo
   coordinates: [0, 1, 0]

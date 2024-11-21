@@ -59,75 +59,90 @@ const (
 // }
 
 type Room struct {
-	// area Area
-	coordinates []int
+	Area        *Area `yaml:"area"`
+	Coordinates []int `yaml:"coordinates"`
 	// 	// DefaultItems
 	// 	// DefaultNPSs []NPC
 	// 	// Exits
-	id string
+	Id string `yaml:"id"`
 	// 	// Items []Item
 	// 	// NPCs  []NPC
-	players map[string]*Player
+	Players map[string]*Player `yaml:"-"`
 	// 	// Script string
-	title       string
-	description string
+	Title       string `yaml:"title"`
+	Description string `yaml:"description"`
 	// // doors []Door
 	// spawnedNpcs map[string]NPC
 
-	// listeners []*eventemitter.Listener
-
-	eventemitter.EventEmitter
-	eventemitter.Observable
+	listeners                 []*eventemitter.Listener `yaml:"-"`
+	eventemitter.EventEmitter `yaml:"-"`
+	eventemitter.Observable   `yaml:"-"`
 }
 
-func NewRoom(em eventemitter.EventEmitter, ob eventemitter.Observable) *Room {
-	// ob.AddListener(
-	// 	eventemitter.EventType("Room#event:playerEnter"),
-	// 	eventemitter.HandleFunc(func(arguments ...interface{}) {
-	// 		log.Info().Msg("Player left room")
-	// 	}))
-	// ob.AddListener(
-	// 	eventemitter.EventType("Room#event:playerLeave"),
-	// 	eventemitter.HandleFunc(func(arguments ...interface{}) {
-	// 		log.Info().Msg("Player entered room")
-	// 	}))
-	// ob.AddListener(
-	// 	eventemitter.EventType("Player#event:enterRoom"),
-	// 	eventemitter.HandleFunc(func(arguments ...interface{}) {
-	// 		log.Info().Msg("Player left room")
-	// 	}))
+func (r *Room) Init(em eventemitter.EventEmitter, ob eventemitter.Observable) {
+	r.EventEmitter = em
+	r.Observable = ob
 
-	return &Room{
-		players: make(map[string]*Player),
+	r.Players = make(map[string]*Player)
 
-		EventEmitter: em,
-		Observable:   ob,
-	}
+	// Setup listeners
+	r.listeners = append(r.listeners,
+		r.AddListener(
+			eventemitter.EventType(RoomPlayerEnter),
+			eventemitter.HandleFunc(r.HandlePlayerEnterEvent)))
+	r.listeners = append(r.listeners,
+		r.AddListener(
+			eventemitter.EventType(RoomPlayerLeave),
+			eventemitter.HandleFunc(r.HandlePlayerLeaveEvent)))
 }
 
+// HandlePlayerEnterEvent
+// player, prevRoom
 func (r *Room) HandlePlayerEnterEvent(arguments ...interface{}) {
-	log.Info().Msg("Player entered room")
+	log.Debug().
+		Str("event", string(RoomPlayerEnter)).
+		Str("area_id", r.Area.Name).
+		Str("room_id", r.Id).
+		Msg("Player entered room:listener")
+
+	if len(arguments) < 2 {
+		log.Error().Msg("HandlePlayerEnterEvent: not enough arguments")
+		return
+	}
+
+	// p := arguments[0].(*Player)
+	// prevRoom := arguments[1].(*Room)
+
+	// for _, player := range prevRoom.Players {
+	// 	if player.Name != p.Name {
+	// 		io.WriteString(player.Session, cfmt.Sprintf("{{%s}} has entered the room.\n", p.Name))
+	// 	}
+	// }
 }
 
+// HandlePlayerLeaveEvent
+// player, nextRoom
 func (r *Room) HandlePlayerLeaveEvent(arguments ...interface{}) {
-	log.Info().Msg("Player left room")
+	log.Debug().
+		Str("event", string(RoomPlayerLeave)).
+		Str("area_id", r.Area.Name).
+		Str("room_id", r.Id).
+		Msg("Player left room:listener")
+
+	if len(arguments) < 2 {
+		log.Error().Msg("HandlePlayerLeaveEvent: not enough arguments")
+		return
+	}
+
+	// p := arguments[0].(*Player)
+	// nextRoom := arguments[1].(*Room)
+
 }
 
 // AddItem implements Room.
 func (r *Room) AddItem(item *Item) {
 	panic("unimplemented")
 }
-
-// func (r *Room) AddListener2(behaviorName string) {
-// 	log.Debug().Str("source", "room").Str("event", behaviorName).Msg("Adding listener")
-
-// 	// r.AddListener(
-// 	// 	eventemitter.EventType("Room#event:playerEnter"),
-// 	// 	eventemitter.HandleFunc(func(arguments ...interface{}) {
-// 	// 		log.Info().Msg("Player entered room")
-// 	// 	}))
-// 	// r.listeners = append(r.listeners, listener)
-// }
 
 // AddNpc implements Room.
 func (r *Room) AddNpc(npc *Npc) {
@@ -136,7 +151,7 @@ func (r *Room) AddNpc(npc *Npc) {
 
 // AddPlayer implements Room.
 func (r *Room) AddPlayer(p *Player) {
-	r.players[p.Name] = p
+	r.Players[p.Name] = p
 }
 
 // CloseDoor implements Room.
@@ -174,10 +189,6 @@ func (r *Room) GetExits() {
 	panic("unimplemented")
 }
 
-func (r *Room) GetID() string {
-	return r.id
-}
-
 // HasDoor implements Room.
 func (r *Room) HasDoor(fromRoom *Room) bool {
 	panic("unimplemented")
@@ -210,12 +221,12 @@ func (r *Room) RemoveNpc(n *Npc, removeSpawn bool) {
 
 // RemovePlayer implements Room.
 func (r *Room) RemovePlayer(p *Player) {
-	delete(r.players, p.Name)
+	delete(r.Players, p.Name)
 }
 
 func (r *Room) Render(s ssh.Session) {
-	io.WriteString(s, cfmt.Sprintf("{{%s}}::yellow|bold\n", r.title))
-	io.WriteString(s, cfmt.Sprintf("{{%s}}::bold\n", r.description))
+	io.WriteString(s, cfmt.Sprintf("{{%s}}::yellow|bold\n", r.Title))
+	io.WriteString(s, cfmt.Sprintf("{{%s}}::bold\n", r.Description))
 }
 
 // SpawnItem implements Room.

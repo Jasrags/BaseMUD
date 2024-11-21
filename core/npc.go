@@ -10,15 +10,26 @@ type Npc struct {
 	// Behaviors map[string]Behavior
 
 	Character
+
+	listeners                 []*eventemitter.Listener `yaml:"-"`
+	eventemitter.EventEmitter `yaml:"-"`
+	eventemitter.Observable   `yaml:"-"`
 }
 
-func NewNPC(em eventemitter.EventEmitter, ob eventemitter.Observable) *Npc {
-	n := &Npc{}
+// func NewNPC(em eventemitter.EventEmitter, ob eventemitter.Observable) *Npc {
+// 	n := &Npc{}
 
+// 	n.EventEmitter = em
+// 	n.Observable = ob
+
+// 	return n
+// }
+
+func (n *Npc) Init(em eventemitter.EventEmitter, ob eventemitter.Observable) {
 	n.EventEmitter = em
 	n.Observable = ob
 
-	return n
+	// Setup listeners
 }
 
 // Hydrate implements NPC.

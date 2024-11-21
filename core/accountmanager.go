@@ -1,9 +1,14 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/viper"
 )
 
 // type AccountManager interface {
@@ -24,45 +29,72 @@ type AccountManager struct {
 }
 
 // AddAccount implements AccountManager.
-func (a *AccountManager) AddAccount(acc *Account) error {
+func (am *AccountManager) AddAccount(acc *Account) error {
 	// Check if the account is already registered, error if so
-	if _, ok := a.Accounts[acc.GetUsername()]; ok {
+	if _, ok := am.Accounts[acc.Username]; ok {
 		log.Error().Msg("Account already exists")
 		return errors.New("account already exists")
 	}
 
 	// Add the account to the map
-	a.Accounts[acc.GetUsername()] = acc
+	am.Accounts[acc.Username] = acc
 
 	return nil
 }
 
 // GetAccount implements AccountManager.
-func (a *AccountManager) GetAccount(username string) (*Account, error) {
-	if acc, ok := a.Accounts[username]; ok {
+func (am *AccountManager) GetAccount(username string) (*Account, error) {
+	if acc, ok := am.Accounts[strings.ToLower(username)]; ok {
 		return acc, nil
 	}
 
-	log.Warn().Msg("Account not found")
+	log.Warn().
+		Str("username", username).
+		Msg("Account not found")
 	return nil, errors.New("account not found")
 }
 
 // LoadAccount implements AccountManager.
-func (a *AccountManager) LoadAccount(username string, force bool) (*Account, error) {
+func (am *AccountManager) LoadAccount(username string, force bool) (*Account, error) {
 	panic("unimplemented")
 }
 
-func (a *AccountManager) LoadAccounts() error {
+func (am *AccountManager) LoadAccounts() error {
 	log.Info().Msg("Loading accounts")
-	a.Accounts = map[string]*Account{
-		"test": {
-			Id:         "1",
-			Username:   "test",
-			Characters: []string{"test"},
-			Password:   "test",
-			Banned:     false,
-		},
+
+	files, err := os.ReadDir(viper.GetString("data.accounts_path"))
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to read accounts directory")
+
+		return err
 	}
+
+	for _, file := range files {
+		if filepath.Ext(file.Name()) == ".json" {
+			filePath := filepath.Join("_data/accounts", file.Name())
+
+			data, err := os.ReadFile(filePath)
+			if err != nil {
+				log.Error().Err(err).Msgf("Failed to read file %s", filePath)
+				continue
+			}
+
+			var acc Account
+			if err := json.Unmarshal(data, &acc); err != nil {
+				log.Error().Err(err).Msgf("Failed to unmarshal account data from file %s", filePath)
+				continue
+			}
+
+			am.Accounts[strings.ToLower(acc.Username)] = &acc
+			log.Debug().
+				Str("username", acc.Username).
+				Msg("Loaded account")
+		}
+	}
+
+	log.Info().
+		Int("count", len(am.Accounts)).
+		Msg("Accounts loaded")
 
 	return nil
 }

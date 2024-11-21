@@ -15,12 +15,12 @@ import eventemitter "github.com/vansante/go-event-emitter"
 // }
 
 type Area struct {
-	Name  string
-	Title string
+	Name  string `yaml:"name"`
+	Title string `yaml:"title"`
 	// Script string
 	// Map   map[int]Coordinate
-	Rooms map[string]*Room
-	Npcs  []*Npc
+	Rooms map[string]*Room `yaml:"-"`
+	Npcs  []*Npc           `yaml:"-"`
 	// Info Object
 	// LastRespawnTick int
 
@@ -48,7 +48,7 @@ func (a *Area) AddNpc(n *Npc) {
 // Emits
 // Area#event:roomAdded
 func (a *Area) AddRoom(r *Room) {
-	a.Rooms[r.GetID()] = r
+	a.Rooms[r.Id] = r
 }
 
 // AddRoomToMap implements Area.
@@ -87,7 +87,7 @@ func (a *Area) RemoveNpc(n *Npc) {
 // RemoveRoom implements Area.
 // Emits Area#event:roomRemoved
 func (a *Area) RemoveRoom(r *Room) {
-	delete(a.Rooms, r.GetID())
+	delete(a.Rooms, r.Id)
 }
 
 // Update implements Area.

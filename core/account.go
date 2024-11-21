@@ -1,9 +1,13 @@
 package core
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
 	"strings"
 
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/viper"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -23,11 +27,11 @@ import (
 // }
 
 type Account struct {
-	Id         string
-	Username   string
-	Characters []string
-	Password   string
-	Banned     bool
+	Id         string   `json:"id"`
+	Username   string   `json:"username"`
+	Characters []string `json:"characters"`
+	Password   string   `json:"password"`
+	Banned     bool     `json:"banned"`
 }
 
 func NewAccount() *Account {
@@ -69,15 +73,6 @@ func (a *Account) DeleteCharacter(name string) {
 	}
 }
 
-func (a *Account) GetID() string {
-	return a.Id
-}
-
-// GetUsername implements Account.
-func (a *Account) GetUsername() string {
-	return a.Username
-}
-
 // HasCharacter implements Account.
 func (a *Account) HasCharacter(name string) bool {
 	for _, v := range a.Characters {
@@ -89,14 +84,29 @@ func (a *Account) HasCharacter(name string) bool {
 	return false
 }
 
-// Save implements Account.
-func (a *Account) Save(callback func()) {
-	panic("unimplemented")
-}
+func (a *Account) Save() {
+	var sb strings.Builder
 
-// Serialize implements Account.
-func (a *Account) Serialize() string {
-	return ""
+	e := json.NewEncoder(&sb)
+	e.SetEscapeHTML(false)
+	e.SetIndent("", "  ")
+
+	if err := e.Encode(a); err != nil {
+		log.Error().
+			Err(err).
+			Msg("Failed to encode account to JSON")
+		return
+	}
+
+	filePath := fmt.Sprintf("%s/%s.json",
+		viper.GetString("data.accounts_path"), strings.ToLower(a.Username))
+
+	if err := os.WriteFile(filePath, []byte(sb.String()), 0644); err != nil {
+		log.Error().
+			Err(err).
+			Msg("Failed to write account to file")
+		return
+	}
 }
 
 // SetPassword implements Account.

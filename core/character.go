@@ -86,8 +86,6 @@ type Character struct {
 	// extraPrompts
 	// questData
 
-	eventemitter.EventEmitter
-	eventemitter.Observable
 }
 
 func NewCharacter() *Character {

@@ -4,7 +4,6 @@ import (
 	"net"
 	"os"
 
-	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gliderlabs/ssh"
@@ -22,8 +21,6 @@ type World struct {
 	room    *RoomManager
 	pubSub  *gochannel.GoChannel
 
-	// e emitter.Emitter
-
 	eventemitter.EventEmitter
 	eventemitter.Observable
 }
@@ -31,17 +28,15 @@ type World struct {
 func NewWorld() *World {
 	e := eventemitter.NewEmitter(true)
 
-	pubSub := gochannel.NewGoChannel(
-		gochannel.Config{},
-		watermill.NewStdLogger(true, false),
-	)
-
-	// ee := emitter.New(10)
+	// pubSub := gochannel.NewGoChannel(
+	// 	gochannel.Config{},
+	// 	watermill.NewStdLogger(true, false),
+	// )
 
 	return &World{
 		EventEmitter: e,
 		Observable:   e,
-		pubSub:       pubSub,
+		// pubSub:       pubSub,
 
 		account: NewAccountManager(),
 		player:  NewPlayerManager(e, e),
@@ -129,11 +124,10 @@ func (w *World) outputConfig() {
 func (w *World) setupSSHServer() {
 	serverHost := viper.GetString("server.host")
 	serverPort := viper.GetString("server.port")
-	serverIdleTimeout := viper.GetDuration("server.idle_timeout")
 
 	srv := &ssh.Server{
 		Addr:        net.JoinHostPort(serverHost, serverPort),
-		IdleTimeout: serverIdleTimeout,
+		IdleTimeout: viper.GetDuration("server.idle_timeout"),
 		ConnectionFailedCallback: func(conn net.Conn, err error) {
 			log.Error().Err(err).Msg("Connection failed")
 			conn.Close()
@@ -168,55 +162,31 @@ func (w *World) Handler(s ssh.Session) {
 		Str("session_id", s.Context().SessionID()).
 		Msg("New SSH connection")
 
-	a, err := w.account.GetAccount("test")
-
+	a, err := w.account.GetAccount("Admin")
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to get account")
 		return
 	}
-	a.Serialize()
+	a.Save() // TODO: remove this once we have a good file structure
 
-	p, err := w.player.GetPlayer("test")
+	p, err := w.player.GetPlayer("Admin")
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to get player")
 		return
 	}
-	p.Serialize()
+	p.Init(w.EventEmitter, w.Observable)
+	p.Save() // TODO: remove this once we have a good file structure
 
-	theVoid, err := w.room.GetRoom("the_void:the_void")
+	theVoid, err := w.room.GetRoom("limbo:limbo")
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to get room")
 		return
 	}
-	limbo, err := w.room.GetRoom("the_void:limbo")
+	limbo, err := w.room.GetRoom("limbo:the_void")
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to get room")
 		return
 	}
-
-	// theVoid.AddCapturer(eventemitter.CaptureFunc(func(event eventemitter.EventType, arguments ...interface{}) {
-	// 	l := log.Info().Str("event", string(event))
-	// 	for _, arg := range arguments {
-	// 		l.Interface("arg", arg)
-	// 	}
-	// 	l.Msg("Player entered room:capturer")
-	// }))
-
-	theVoid.AddListener(RoomPlayerEnter, eventemitter.HandleFunc(func(arguments ...interface{}) {
-		l := log.Info().Str("event", string(RoomPlayerEnter))
-		for _, arg := range arguments {
-			l.Interface("arg", arg)
-		}
-		l.Msg("Player entered room:listener")
-	}))
-
-	theVoid.AddListener(RoomPlayerLeave, eventemitter.HandleFunc(func(arguments ...interface{}) {
-		l := log.Info().Str("event", string(RoomPlayerEnter))
-		for _, arg := range arguments {
-			l.Interface("arg", arg)
-		}
-		l.Msg("Player left room:listener")
-	}))
 
 	// p.EnterRoom(theVoid)
 	theVoid.Render(s)
